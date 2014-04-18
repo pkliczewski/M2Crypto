@@ -530,6 +530,55 @@ PyObject *ssl_read(SSL *ssl, int num) {
     return obj;
 }
 
+PyObject *ssl_peek(SSL *ssl, int num) {
+    PyObject *obj = NULL;
+    void *buf;
+    int r, err;
+
+    if (!(buf = PyMem_Malloc(num))) {
+        PyErr_SetString(PyExc_MemoryError, "ssl_peek");
+        return NULL;
+    }
+
+
+    Py_BEGIN_ALLOW_THREADS
+    r = SSL_peek(ssl, buf, num);
+    Py_END_ALLOW_THREADS
+
+
+    switch (SSL_get_error(ssl, r)) {
+        case SSL_ERROR_NONE:
+        case SSL_ERROR_ZERO_RETURN:
+            buf = PyMem_Realloc(buf, r);
+            obj = PyString_FromStringAndSize(buf, r);
+            break;
+        case SSL_ERROR_WANT_WRITE:
+        case SSL_ERROR_WANT_READ:
+        case SSL_ERROR_WANT_X509_LOOKUP:
+            Py_INCREF(Py_None);
+            obj = Py_None;
+            break;
+        case SSL_ERROR_SSL:
+            PyErr_SetString(_ssl_err, ERR_reason_error_string(ERR_get_error()));
+            obj = NULL;
+            break;
+        case SSL_ERROR_SYSCALL:
+            err = ERR_get_error();
+            if (err)
+                PyErr_SetString(_ssl_err, ERR_reason_error_string(err));
+            else if (r == 0)
+                PyErr_SetString(_ssl_err, "unexpected eof");
+            else if (r == -1)
+                PyErr_SetFromErrno(_ssl_err);
+            obj = NULL;
+            break;
+    }
+    PyMem_Free(buf);
+
+
+    return obj;
+}
+
 PyObject *ssl_read_nbio(SSL *ssl, int num) {
     PyObject *obj = NULL;
     void *buf;

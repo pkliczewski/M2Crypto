@@ -223,6 +223,11 @@ class Connection:
         return self._read_nbio(size)
     recv = read
 
+    def peek(self, size=1024):
+        if size <= 0:
+            raise ValueError, 'size <= 0'
+        return m2.ssl_peek(self.ssl, size)
+
     def setblocking(self, mode):
         """Set this connection's underlying socket to _mode_."""
         self.socket.setblocking(mode)
